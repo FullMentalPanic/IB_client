@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <vector>
+#include <boost/thread.hpp>
 
 class EClientSocket;
 
@@ -18,16 +19,13 @@ public:
 	~TWS_Client();
 
 	void setConnectOptions(const std::string&);
-	void processMessages();
-
-public:
-
 	bool connect(const char * host, int port, int clientId = 0);
-	void disconnect() const;
-	bool isConnected() const;
+	void disconnect();
+	bool isConnected();
+	void accountOperations();
 
 private:
-
+	void run();
 public:
 	// events
 	#include "EWrapper_prototypes.h"
@@ -36,11 +34,12 @@ private:
 	//! [socket_declare]
 	EReaderOSSignal m_osSignal;
 	EClientSocket * m_pClient;
+	boost::thread *worker;
 	//! [socket_declare]
 	time_t m_sleepDeadline;
 
 	OrderId m_orderId;
 	std::unique_ptr<EReader> m_pReader;
     bool m_extraAuth;
-	std::string m_bboExchange;
+	//std::string m_bboExchange;
 };

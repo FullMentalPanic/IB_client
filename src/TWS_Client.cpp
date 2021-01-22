@@ -1,11 +1,17 @@
 #include "TWS_Client.h"
 #include "EClientSocket.h"
 
+#include "AccountSummaryTags.h"
+
+#include <thread>
+
+#define DEBUG
 
 TWS_Client::TWS_Client(){
     m_osSignal = EReaderOSSignal(2000);
     m_pClient  = new EClientSocket(this, &m_osSignal);
     m_orderId = 0;
+	m_extraAuth = false;
 }
 
 TWS_Client::~TWS_Client(){
@@ -15,7 +21,7 @@ TWS_Client::~TWS_Client(){
 	delete m_pClient;
 }
 
-bool TWS_Client::connect(const char * host, int port, int clientId = 0 ){	
+bool TWS_Client::connect(const char * host, int port, int clientId){	
 	bool bRes = m_pClient->eConnect( host, port, clientId, m_extraAuth);
 	
 	if (bRes) {
@@ -23,8 +29,9 @@ bool TWS_Client::connect(const char * host, int port, int clientId = 0 ){
 		m_pReader = std::unique_ptr<EReader>( new EReader(m_pClient, &m_osSignal) );
 		m_pReader->start();
 
-		
-
+		boost::function0<void> f = boost::bind(&TWS_Client::run, this);
+		boost::thread t(f);
+		worker = &t;		
 	}
 	else
 		printf( "Cannot connect to %s:%d clientId:%d\n", m_pClient->host().c_str(), m_pClient->port(), clientId);
@@ -34,10 +41,58 @@ bool TWS_Client::connect(const char * host, int port, int clientId = 0 ){
 
 void TWS_Client::disconnect(){
 
+	m_pClient->eDisconnect();
+	worker->interrupt();//end thread
+	worker->join();//end thread
+	printf ( "Disconnected\n");
 }
+
 bool TWS_Client::isConnected(){
+	return m_pClient->isConnected();
 
 }
+
+void TWS_Client::setConnectOptions(const std::string& connectOptions){
+	m_pClient->setConnectOptions(connectOptions);
+}
+
+void TWS_Client::run(){
+	while (m_pClient-> isConnected()){
+		m_osSignal.waitForSignal();
+		m_pReader->processMsgs();
+	}
+}
+
+void TWS_Client::connectAck() {
+	if (!m_extraAuth && m_pClient->asyncEConnect())
+        m_pClient->startApi();
+}
+
+void TWS_Client::connectionClosed(){
+	printf("Connection Close\n");
+}
+
+void TWS_Client::winError( const std::string& str, int lastError) {}
+void TWS_Client::error(int id, int errorCode, const std::string& errorString) {
+	printf( "Error. Id: %d, Code: %d, Msg: %s\n", id, errorCode, errorString.c_str());	
+}
+
+void TWS_Client::nextValidId( OrderId orderId){
+	#ifdef DEBUG
+	printf("Next Valid Id: %ld\n", orderId);
+	#endif
+	m_orderId = orderId;
+}
+
+void TWS_Client::accountOperations(){
+	m_pClient->reqManagedAccts();
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->reqAccountSummary(9001, "All", AccountSummaryTags::BuyingPower);
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->cancelAccountSummary(9001);
+}
+
+
 
 void TWS_Client::tickPrice( TickerId tickerId, TickType field, double price, const TickAttrib& attrib) {}
 void TWS_Client::tickSize( TickerId tickerId, TickType field, int size) {}
@@ -52,8 +107,6 @@ void TWS_Client::orderStatus( OrderId orderId, const std::string& status, double
 	double lastFillPrice, int clientId, const std::string& whyHeld, double mktCapPrice) {}
 void TWS_Client::openOrder( OrderId orderId, const Contract&, const Order&, const OrderState&) {}
 void TWS_Client::openOrderEnd() {}
-void TWS_Client::winError( const std::string& str, int lastError) {}
-void TWS_Client::connectionClosed() {}
 void TWS_Client::updateAccountValue(const std::string& key, const std::string& val,
 const std::string& currency, const std::string& accountName) {}
 void TWS_Client::updatePortfolio( const Contract& contract, double position,
@@ -61,13 +114,11 @@ void TWS_Client::updatePortfolio( const Contract& contract, double position,
 	double unrealizedPNL, double realizedPNL, const std::string& accountName) {}
 void TWS_Client::updateAccountTime(const std::string& timeStamp) {}
 void TWS_Client::accountDownloadEnd(const std::string& accountName) {}
-void TWS_Client::nextValidId( OrderId orderId) {}
 void TWS_Client::contractDetails( int reqId, const ContractDetails& contractDetails) {}
 void TWS_Client::bondContractDetails( int reqId, const ContractDetails& contractDetails) {}
 void TWS_Client::contractDetailsEnd( int reqId) {}
 void TWS_Client::execDetails( int reqId, const Contract& contract, const Execution& execution) {}
 void TWS_Client::execDetailsEnd( int reqId) {}
-void TWS_Client::error(int id, int errorCode, const std::string& errorString) {}
 void TWS_Client::updateMktDepth(TickerId id, int position, int operation, int side,
 	double price, int size) {}
 void TWS_Client::updateMktDepthL2(TickerId id, int position, const std::string& marketMaker, int operation,
@@ -100,7 +151,6 @@ void TWS_Client::displayGroupList( int reqId, const std::string& groups) {}
 void TWS_Client::displayGroupUpdated( int reqId, const std::string& contractInfo) {}
 void TWS_Client::verifyAndAuthMessageAPI( const std::string& apiData, const std::string& xyzChallange) {}
 void TWS_Client::verifyAndAuthCompleted( bool isSuccessful, const std::string& errorText) {}
-void TWS_Client::connectAck() {}
 void TWS_Client::positionMulti( int reqId, const std::string& account,const std::string& modelCode, const Contract& contract, double pos, double avgCost) {}
 void TWS_Client::positionMultiEnd( int reqId) {}
 void TWS_Client::accountUpdateMulti( int reqId, const std::string& account, const std::string& modelCode, const std::string& key, const std::string& value, const std::string& currency) {}
