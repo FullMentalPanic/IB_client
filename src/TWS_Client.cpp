@@ -1,7 +1,12 @@
+/*
+base Class to process recv info
+*/
+
 #include "TWS_Client.h"
 #include "EClientSocket.h"
 
 #include "AccountSummaryTags.h"
+#include "TickType.h"
 
 #include <thread>
 
@@ -12,6 +17,9 @@ TWS_Client::TWS_Client(){
     m_pClient  = new EClientSocket(this, &m_osSignal);
     m_orderId = 0;
 	m_extraAuth = false;
+
+	baseTickerId = 0;
+	myContracts = SymbolContracts("Contract.csv",baseTickerId);
 }
 
 TWS_Client::~TWS_Client(){
@@ -20,6 +28,8 @@ TWS_Client::~TWS_Client(){
 
 	delete m_pClient;
 }
+
+
 
 bool TWS_Client::connect(const char * host, int port, int clientId){	
 	bool bRes = m_pClient->eConnect( host, port, clientId, m_extraAuth);
@@ -56,6 +66,44 @@ void TWS_Client::setConnectOptions(const std::string& connectOptions){
 	m_pClient->setConnectOptions(connectOptions);
 }
 
+void TWS_Client::init(){
+	m_pClient->reqManagedAccts();
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->reqAccountSummary(9001, "All", AccountSummaryTags::getAllTags());
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->cancelAccountSummary(9001);
+
+}
+
+void TWS_Client::updateCashandBuyPower(){
+	m_pClient->reqAccountSummary(9002, "All", AccountSummaryTags::BuyingPower);
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->reqAccountSummary(9003, "All", AccountSummaryTags::TotalCashValue);
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->cancelAccountSummary(9002);
+	m_pClient->cancelAccountSummary(9003);
+
+}
+
+void TWS_Client::test(){
+	
+	m_pClient->reqManagedAccts();
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->reqAccountSummary(9001, "All", AccountSummaryTags::getAllTags());
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	m_pClient->cancelAccountSummary(9001);
+
+	myAccountInfo.displayAccountInfo();
+	myContracts.DisplayContracts();
+
+	for (int i = 0; i < myContracts.total; i++){
+		m_pClient->reqMktData(myContracts.tickIDs[i], myContracts.contracts[i], "", false, false, TagValueListSPtr());
+	}
+
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+
+}
+
 void TWS_Client::run(){
 	while (m_pClient-> isConnected()){
 		m_osSignal.waitForSignal();
@@ -70,6 +118,7 @@ void TWS_Client::connectAck() {
 
 void TWS_Client::connectionClosed(){
 	printf("Connection Close\n");
+	throw (NET_CLOSE);
 }
 
 void TWS_Client::winError( const std::string& str, int lastError) {}
@@ -84,24 +133,465 @@ void TWS_Client::nextValidId( OrderId orderId){
 	m_orderId = orderId;
 }
 
-void TWS_Client::accountOperations(){
-	m_pClient->reqManagedAccts();
-	std::this_thread::sleep_for(std::chrono::seconds(2));
-	m_pClient->reqAccountSummary(9001, "All", AccountSummaryTags::BuyingPower);
-	std::this_thread::sleep_for(std::chrono::seconds(2));
-	m_pClient->cancelAccountSummary(9001);
+void TWS_Client::accountSummary( int reqId, const std::string& account, const std::string& tag, const std::string& value, const std::string& curency) {
+	#ifdef DEBUG
+	printf( "Acct Summary. ReqId: %d, Account: %s, Tag: %s, Value: %s, Currency: %s\n", reqId, account.c_str(), tag.c_str(), value.c_str(), curency.c_str());
+	#endif
+	if (tag == "BuyingPower"){
+		myAccountInfo.BuyingPower = std::stof(value);
+		return;
+	}
+	if (tag == "TotalCashValue"){
+		myAccountInfo.TotalCashValue = std::stof(value);
+		myAccountInfo.Currency = curency;
+		return;
+	}
+	if (tag == "AccountType"){
+		myAccountInfo.Account = account;
+		myAccountInfo.AccountType = value;
+		return;
+	}
+	if (tag == "Cushion"){
+		myAccountInfo.Cushion = std::stoi(value);
+		return;
+	}
+	if (tag == "DayTradesRemaining"){
+		myAccountInfo.DayTradesRemaining = std::stoi(value);
+		return;
+	}
+	if (tag == "LookAheadNextChange"){
+		myAccountInfo.LookAheadNextChange = std::stoi(value);
+		return;
+	}
+	if (tag == "AccruedCash"){
+		myAccountInfo.AccruedCash = std::stof(value);
+		return;
+	}
+	if (tag == "AvailableFunds"){
+		myAccountInfo.AvailableFunds = std::stof(value);
+		return;
+	}
+	if (tag == "EquityWithLoanValue"){
+		myAccountInfo.EquityWithLoanValue = std::stof(value);
+		return;
+	}
+	if (tag == "ExcessLiquidity"){
+		myAccountInfo.ExcessLiquidity = std::stof(value);
+		return;
+	}
+	if (tag == "FullAvailableFunds"){
+		myAccountInfo.FullAvailableFunds = std::stof(value);
+		return;
+	}
+	if (tag == "FullExcessLiquidity"){
+		myAccountInfo.FullExcessLiquidity = std::stof(value);
+		return;
+	}
+	if (tag == "FullInitMarginReq"){
+		myAccountInfo.FullInitMarginReq = std::stof(value);
+		return;
+	}
+	if (tag == "GrossPositionValue"){
+		myAccountInfo.GrossPositionValue = std::stof(value);
+		return;
+	}
+	if (tag == "InitMarginReq"){
+		myAccountInfo.InitMarginReq = std::stof(value);
+		return;
+	}
+	if (tag == "LookAheadAvailableFunds"){
+		myAccountInfo.LookAheadAvailableFunds = std::stof(value);
+		return;
+	}
+	if (tag == "LookAheadExcessLiquidity"){
+		myAccountInfo.LookAheadExcessLiquidity = std::stof(value);
+		return;
+	}
+	if (tag == "LookAheadInitMarginReq"){
+		myAccountInfo.LookAheadInitMarginReq = std::stof(value);
+		return;
+	}
+	if (tag == "LookAheadMaintMarginReq"){
+		myAccountInfo.LookAheadMaintMarginReq = std::stof(value);
+		return;
+	}
+	if (tag == "MaintMarginReq"){
+		myAccountInfo.MaintMarginReq = std::stof(value);
+		return;
+	}
+	if (tag == "NetLiquidation"){
+		myAccountInfo.NetLiquidation = std::stof(value);
+		return;
+	}
+	if (tag == "SMA"){
+		myAccountInfo.SMA = std::stof(value);
+		return;
+	}
 }
 
 
+void TWS_Client::tickPrice( TickerId tickerId, TickType field, double price, const TickAttrib& attrib) {
+	#ifdef DEBUG
+	printf( "Tick Price. Ticker Id: %ld, Field: %d, Price: %g, CanAutoExecute: %d, PastLimit: %d, PreOpen: %d\n", tickerId, (int)field, price, attrib.canAutoExecute, attrib.pastLimit, attrib.preOpen);
+	#endif
+	int num = tickerId - baseTickerId;
+	if (myContracts.total <= num){
+		return;
+	}
+	switch (field){
+		case BID_PRICE:
+			myContracts.BidPrice[num] = price;
+			return;
+		case ASK_PRICE:
+			myContracts.AskPrice[num] = price;
+			return;
+		case LAST_PRICE:
+			myContracts.LastPrice[num] = price;
+			return;
+		case HIGH:
+			/* code */
+			return;
+		case LOW:
+			/* code */
+			return;
+		case CLOSE_PRICE:
+			/* code */
+			return;
+		case OPEN_TICK:
+			/* code */
+			return;
+		case LOW_13_WEEKS:
+			/* code */
+			return;
+		case HIGH_13_WEEKS:
+			/* code */
+			return;
+		case LOW_26_WEEKS:
+			/* code */
+			return;
+		case HIGH_26_WEEKS:
+			/* code */
+			return;
+		case LOW_52_WEEKS:
+			/* code */
+			return;
+		case HIGH_52_WEEKS:
+			/* code */
+			return;
+		case AUCTION_PRICE:
+			/* code */
+			return;
+		case MARK_PRICE:
+			/* code */
+			return;
+		case BID_YIELD:
+			/* code */
+			return;
+		case ASK_YIELD:
+			/* code */
+			return;
+		case LAST_YIELD:
+			/* code */
+			return;
+		case LAST_RTH_TRADE:
+			/* code */
+			return;
+		case DELAYED_BID:
+			/* code */
+			return;
+		case DELAYED_ASK:
+			/* code */
+			return;
+		case DELAYED_LAST:
+			/* code */
+			return;
+		case DELAYED_HIGH_PRICE:
+			/* code */
+			return;
+		case DELAYED_LOW_PRICE:
+			/* code */
+			return;
+		case DELAYED_CLOSE:
+			/* code */
+			return;
+		case DELAYED_OPEN:
+			/* code */
+			return;
+		case CREDITMAN_MARK_PRICE:
+			/* code */
+			return;
+		case CREDITMAN_SLOW_MARK_PRICE:
+			/* code */
+			return;
+		case DELAYED_BID_OPTION:
+			/* code */
+			return;
+		case DELAYED_ASK_OPTION:
+			/* code */
+			return;
+		case DELAYED_LAST_OPTION:
+			/* code */
+			return;
+		case DELAYED_MODEL_OPTION:
+			/* code */
+			return;
+		case ETF_NAV_CLOSE:
+			/* code */
+			return;
+		case ETF_NAV_PRIOR_CLOSE:
+			/* code */
+			return;
+		case ETF_NAV_BID:
+			/* code */
+			return;
+		case ETF_NAV_ASK:
+			/* code */
+			return;
+		case ETF_NAV_LAST:
+			/* code */
+			return;
+		case ETF_NAV_FROZEN_LAST:
+			/* code */
+			return;
+		case ETF_NAV_HIGH:
+			/* code */
+			return;	
+		case ETF_NAV_LOW:
+			/* code */
+			return;						
+		default:
+			return;
+	}
+}
 
-void TWS_Client::tickPrice( TickerId tickerId, TickType field, double price, const TickAttrib& attrib) {}
-void TWS_Client::tickSize( TickerId tickerId, TickType field, int size) {}
+void TWS_Client::tickSize( TickerId tickerId, TickType field, int size) {
+	#ifdef DEBUG
+	printf( "Tick Size. Ticker Id: %ld, Field: %d, Size: %d\n", tickerId, (int)field, size);
+	#endif
+	int num = tickerId - baseTickerId;
+	if (myContracts.total <= num){
+		return;
+	}
+	switch (field){
+		case BID_SIZE:
+			myContracts.BidSize[num] = size;
+			return;
+		case ASK_SIZE:
+			myContracts.AskSize[num] = size;
+			return;
+		case LAST_SIZE:
+			/* code */
+			return;
+		case VOLUME:
+			/* code */
+			return;
+		case AVERAGE_VOLUME:
+			/* code */
+			return;
+		case AUCTION_IMBALANCE:
+			/* code */
+			return;
+		case OPEN_INTEREST:
+			/* code */
+			return;
+		case OPTION_CALL_OPEN_INTEREST:
+			/* code */
+			return;
+		case OPTION_PUT_OPEN_INTEREST:
+			/* code */
+			return;
+		case OPTION_CALL_VOLUME:
+			/* code */
+			return;
+		case OPTION_PUT_VOLUME:
+			/* code */
+			return;
+		case AUCTION_VOLUME:
+			/* code */
+			return;
+		case REGULATORY_IMBALANCE:
+			/* code */
+			return;
+		case SHORT_TERM_VOLUME_3_MINUTES:
+			/* code */
+			return;
+		case SHORT_TERM_VOLUME_5_MINUTES:
+			/* code */
+			return;
+		case SHORT_TERM_VOLUME_10_MINUTES:
+			/* code */
+			return;
+		case DELAYED_BID_SIZE:
+			/* code */
+			return;
+		case DELAYED_ASK_SIZE:
+			/* code */
+			return;
+		case DELAYED_LAST_SIZE:
+			/* code */
+			return;
+		case DELAYED_VOLUME:
+			/* code */
+			return;
+		case FUTURES_OPEN_INTEREST:
+			/* code */
+			return;
+		case AVERAGE_OPTION_VOLUME:
+			/* code */
+			return;
+		case SHORTABLE_SHARES:
+			/* code */
+			return;				
+		default:
+			return;
+	}
+}
+
 void TWS_Client::tickOptionComputation( TickerId tickerId, TickType tickType, int tickAttrib, double impliedVol, double delta,
-	double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {}
-void TWS_Client::tickGeneric(TickerId tickerId, TickType tickType, double value) {}
-void TWS_Client::tickString(TickerId tickerId, TickType tickType, const std::string& value) {}
+	double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice) {
+	#ifdef DEBUG
+	printf( "TickOptionComputation. Ticker Id: %ld, Type: %d, TickAttrib: %d, ImpliedVolatility: %g, Delta: %g, OptionPrice: %g, pvDividend: %g, Gamma: %g, Vega: %g, Theta: %g, Underlying Price: %g\n", tickerId, (int)tickType, tickAttrib, impliedVol, delta, optPrice, pvDividend, gamma, vega, theta, undPrice);
+	#endif
+	switch (tickType){
+		case BID_OPTION_COMPUTATION:
+			/* code */
+			return;
+		case ASK_OPTION_COMPUTATION:
+			/* code */
+			return;
+		case LAST_OPTION_COMPUTATION:
+			/* code */
+			return;
+		case MODEL_OPTION_COMPUTATION:
+			/* code */
+			return;
+		case CUSTOM_OPTION_COMPUTATION:
+			/* code */
+			return;
+		default:
+			return;
+	}	
+
+}
+
+void TWS_Client::tickGeneric(TickerId tickerId, TickType tickType, double value) {
+	#ifdef DEBUG
+		printf( "Tick Generic. Ticker Id: %ld, Type: %d, Value: %g\n", tickerId, (int)tickType, value);
+	#endif
+	switch (tickType){
+		case OPTION_HISTORICAL_VOLATILITY:
+			/* code */
+			return;
+		case OPTION_IMPLIED_VOLATILITY:
+			/* code */
+			return;
+		case INDEX_FUTURE_PREMIUM:
+			/* code */
+			return;
+		case SHORTABLE:
+			/* code */
+			return;
+		case HALTED:
+			/* code */
+			return;
+		case TRADE_COUNT:
+			/* code */
+			return;
+		case TRADE_RATE:
+			/* code */
+			return;
+		case VOLUME_RATE:
+			/* code */
+			return;
+		case RT_HISTORICAL_VOLATILITY:
+			/* code */
+			return;
+		case BOND_FACTOR_MULTIPLIER:
+			/* code */
+			return;
+		default:
+			return;
+	}	
+}
+
+void TWS_Client::tickString(TickerId tickerId, TickType tickType, const std::string& value) {
+	#ifdef DEBUG
+	printf( "Tick String. Ticker Id: %ld, Type: %d, Value: %s\n", tickerId, (int)tickType, value.c_str());
+	#endif
+	switch (tickType){
+		case OPTION_BID_EXCHANGE:
+			/* code */
+			return;
+		case OPTION_ASK_EXCHANGE:
+			/* code */
+			return;
+		case BID_EXCHANGE:
+			/* code */
+			return;
+		case ASK_EXCHANGE:
+			/* code */
+			return;
+		case LAST_TIMESTAMP:
+			/* code */
+			return;
+		case RT_VOLUME_TIME_SALES:
+			/* code */
+			return;
+		case IB_DIVIDENDS:
+			/* code */
+			return;
+		case NEWS:
+			/* code */
+			return;
+		case RT_TRADE_VOLUME:
+			/* code */
+			return;
+		case LAST_EXCHANGE:
+			/* code */
+			return;
+		case LAST_REGULATORY_TIME:
+			/* code */
+			return;
+		case DELAYED_LAST_TIMESTAMP:
+			/* code */
+			return;
+		default:
+			return;
+	}		
+}
+
 void TWS_Client::tickEFP(TickerId tickerId, TickType tickType, double basisPoints, const std::string& formattedBasisPoints,
-	double totalDividends, int holdDays, const std::string& futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate) {}
+	double totalDividends, int holdDays, const std::string& futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate) {
+	#ifdef DEBUG
+	printf( "TickEFP. %ld, Type: %d, BasisPoints: %g, FormattedBasisPoints: %s, Total Dividends: %g, HoldDays: %d, Future Last Trade Date: %s, Dividend Impact: %g, Dividends To Last Trade Date: %g\n", tickerId, (int)tickType, basisPoints, formattedBasisPoints.c_str(), totalDividends, holdDays, futureLastTradeDate.c_str(), dividendImpact, dividendsToLastTradeDate);
+	#endif
+	switch (tickType){
+		case BID_EFP_COMPUTATION:
+			/* code */
+			return;
+		case ASK_EFP_COMPUTATION:
+			/* code */
+			return;
+		case LAST_EFP_COMPUTATION:
+			/* code */
+			return;
+		case OPEN_EFP_COMPUTATION:
+			/* code */
+			return;
+		case HIGH_EFP_COMPUTATION:
+			/* code */
+			return;
+		case LOW_EFP_COMPUTATION:
+			/* code */
+			return;
+		case CLOSE_EFP_COMPUTATION:
+			/* code */
+			return;
+		default:
+			return;
+	}		
+}
+
 void TWS_Client::orderStatus( OrderId orderId, const std::string& status, double filled,
 	double remaining, double avgFillPrice, int permId, int parentId,
 	double lastFillPrice, int clientId, const std::string& whyHeld, double mktCapPrice) {}
@@ -143,7 +633,7 @@ void TWS_Client::marketDataType( TickerId reqId, int marketDataType) {}
 void TWS_Client::commissionReport( const CommissionReport& commissionReport) {}
 void TWS_Client::position( const std::string& account, const Contract& contract, double position, double avgCost) {}
 void TWS_Client::positionEnd() {}
-void TWS_Client::accountSummary( int reqId, const std::string& account, const std::string& tag, const std::string& value, const std::string& curency) {}
+
 void TWS_Client::accountSummaryEnd( int reqId) {}
 void TWS_Client::verifyMessageAPI( const std::string& apiData) {}
 void TWS_Client::verifyCompleted( bool isSuccessful, const std::string& errorText) {}
@@ -187,3 +677,5 @@ void TWS_Client::orderBound(long long orderId, int apiClientId, int apiOrderId) 
 void TWS_Client::completedOrder(const Contract& contract, const Order& order, const OrderState& orderState) {}
 void TWS_Client::completedOrdersEnd() {}
 void TWS_Client::replaceFAEnd(int reqId, const std::string& text) {}
+
+

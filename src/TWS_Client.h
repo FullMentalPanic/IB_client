@@ -1,4 +1,6 @@
-
+/*
+base Class to process recv info
+*/
 
 #include "EWrapper.h"
 #include "EReaderOSSignal.h"
@@ -8,7 +10,12 @@
 #include <vector>
 #include <boost/thread.hpp>
 
+#include "SymbolContracts.h"
+#include "AccountInfo.h"
+#include "error.h"
+
 class EClientSocket;
+
 
 
 class TWS_Client : public EWrapper
@@ -22,7 +29,11 @@ public:
 	bool connect(const char * host, int port, int clientId = 0);
 	void disconnect();
 	bool isConnected();
-	void accountOperations();
+	void init();
+	void updateCashandBuyPower();
+	void test();
+
+	long baseTickerId;
 
 private:
 	void run();
@@ -41,5 +52,7 @@ private:
 	OrderId m_orderId;
 	std::unique_ptr<EReader> m_pReader;
     bool m_extraAuth;
-	//std::string m_bboExchange;
+
+	AccountInfo myAccountInfo;
+	SymbolContracts myContracts;
 };

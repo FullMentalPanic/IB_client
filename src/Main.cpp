@@ -26,6 +26,7 @@ int main(int argc, char** argv)
 		TWS_Client client;
 		try{
 			client.connect( host, port, clientId);
+			client.test();
 			while(1){
 				std::this_thread::sleep_for(std::chrono::seconds(SLEEP_TIME));
 			}

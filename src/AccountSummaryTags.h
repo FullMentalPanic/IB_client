@@ -36,3 +36,4 @@ public:
 
 	static std::string getAllTags();
 };
+
