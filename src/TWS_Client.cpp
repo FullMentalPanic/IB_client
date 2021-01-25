@@ -4,13 +4,18 @@ base Class to process recv info
 
 #include "TWS_Client.h"
 #include "EClientSocket.h"
+#include "Order.h"
+#include "OrderState.h"
 
 #include "AccountSummaryTags.h"
 #include "TickType.h"
+#include "OrderSamples.h"
+
 
 #include <thread>
 
 #define DEBUG
+#define SELL_TEST
 
 TWS_Client::TWS_Client(){
     m_osSignal = EReaderOSSignal(2000);
@@ -20,6 +25,7 @@ TWS_Client::TWS_Client(){
 
 	baseTickerId = 0;
 	myContracts = SymbolContracts("Contract.csv",baseTickerId);
+	myOrders = SymbolOrders(myContracts.total);
 }
 
 TWS_Client::~TWS_Client(){
@@ -95,10 +101,40 @@ void TWS_Client::test(){
 
 	myAccountInfo.displayAccountInfo();
 	myContracts.DisplayContracts();
+	
 
 	for (int i = 0; i < myContracts.total; i++){
 		m_pClient->reqMktData(myContracts.tickIDs[i], myContracts.contracts[i], "", false, false, TagValueListSPtr());
 	}
+	
+
+	std::this_thread::sleep_for(std::chrono::seconds(2));
+	myContracts.DisplayPrice();
+
+	while(myContracts.AskPrice[0] < 0.1){
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+	}
+	
+
+	#ifdef BUY_TEST
+	Order myOrder;
+	// Test BUY 
+	for (int i = 0; i < myContracts.total; i++){
+		myOrder = OrderSamples::LimitOrder("BUY", 1, myContracts.AskPrice[i]);
+		m_pClient->placeOrder(m_orderId++, myContracts.contracts[i], myOrder);
+	}
+	#endif
+
+	#ifdef SELL_TEST
+	Order myOrder;
+	// Test SELL 
+	for (int i = 0; i < myContracts.total; i++){
+		myOrders.orderIDs[i] = m_orderId;
+		myOrders.orders[i] = OrderSamples::LimitOrder("SELL", 1, myContracts.AskPrice[i]);
+		//myOrder = OrderSamples::LimitOrder("SELL", 1, myContracts.AskPrice[i]);
+		m_pClient->placeOrder(m_orderId++, myContracts.contracts[i], myOrders.orders[i]);
+	}
+	#endif
 
 	std::this_thread::sleep_for(std::chrono::seconds(2));
 
@@ -594,9 +630,30 @@ void TWS_Client::tickEFP(TickerId tickerId, TickType tickType, double basisPoint
 
 void TWS_Client::orderStatus( OrderId orderId, const std::string& status, double filled,
 	double remaining, double avgFillPrice, int permId, int parentId,
-	double lastFillPrice, int clientId, const std::string& whyHeld, double mktCapPrice) {}
-void TWS_Client::openOrder( OrderId orderId, const Contract&, const Order&, const OrderState&) {}
-void TWS_Client::openOrderEnd() {}
+	double lastFillPrice, int clientId, const std::string& whyHeld, double mktCapPrice) {
+	#ifdef DEBUG
+	printf("OrderStatus. Id: %ld, Status: %s, Filled: %g, Remaining: %g, AvgFillPrice: %g, PermId: %d, LastFillPrice: %g, ClientId: %d, WhyHeld: %s, MktCapPrice: %g\n", 
+	orderId, status.c_str(), filled, remaining, avgFillPrice, permId, lastFillPrice, clientId, whyHeld.c_str(), mktCapPrice);
+	#endif
+}
+
+
+void TWS_Client::openOrder( OrderId orderId, const Contract& contract, const Order& order, const OrderState& orderState) {
+	#ifdef DEBUG
+	printf( "OpenOrder. PermId: %i, ClientId: %ld, OrderId: %ld, Account: %s, Symbol: %s, SecType: %s, Exchange: %s:, Action: %s, OrderType:%s, TotalQty: %g, CashQty: %g, "
+	"LmtPrice: %g, AuxPrice: %g, Status: %s\n", 
+		order.permId, order.clientId, orderId, order.account.c_str(), contract.symbol.c_str(), contract.secType.c_str(), contract.exchange.c_str(), 
+		order.action.c_str(), order.orderType.c_str(), order.totalQuantity, order.cashQty == UNSET_DOUBLE ? 0 : order.cashQty, order.lmtPrice, order.auxPrice, orderState.status.c_str());
+	#endif
+
+}
+
+void TWS_Client::openOrderEnd() {
+	#ifdef DEBUG
+	printf( "OpenOrderEnd\n");
+	#endif
+}
+
 void TWS_Client::updateAccountValue(const std::string& key, const std::string& val,
 const std::string& currency, const std::string& accountName) {}
 void TWS_Client::updatePortfolio( const Contract& contract, double position,

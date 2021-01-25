@@ -11,6 +11,8 @@ base Class to process recv info
 #include <boost/thread.hpp>
 
 #include "SymbolContracts.h"
+#include "SymbolOrders.h"
+
 #include "AccountInfo.h"
 #include "error.h"
 
@@ -55,4 +57,6 @@ private:
 
 	AccountInfo myAccountInfo;
 	SymbolContracts myContracts;
+	SymbolOrders myOrders;
+	
 };

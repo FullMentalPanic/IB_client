@@ -17,10 +17,10 @@ public:
     std::vector <long> tickIDs;
     std::vector <Contract> contracts;
     std::vector <int> BidSize;
-    std::vector <float> BidPrice;
-    std::vector <float> AskPrice;
-    std::vector <float> AskSize;
-    std::vector <float> LastPrice;
+    std::vector <double> BidPrice;
+    std::vector <double> AskPrice;
+    std::vector <double> AskSize;
+    std::vector <double> LastPrice;
     int total;
 
     void DisplayContracts();
