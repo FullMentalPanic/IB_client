@@ -1,0 +1,4 @@
+symbol,secType,currency,exchange,primaryExchange
+AAPL,STK,USD,SMART,ISLAND
+MSFT,STK,USD,SMART,ISLAND
+NFLX,STK,USD,SMART,ISLAND
